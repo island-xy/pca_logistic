@@ -1,0 +1,233 @@
+---
+title: "hw2"
+author: "Ying Xiang"
+date: "2/24/2021"
+output: html_document
+---
+
+```{r}
+#P4
+train_3=read.table("train_3.txt",sep=",")
+train_5=read.table("train_5.txt",sep=",")
+train_8=read.table("train_8.txt",sep=",")
+train_358_X=rbind(train_3,train_5,train_8)
+train_Y=c(rep(3,dim(train_3)[1]),rep(5,dim(train_5)[1]),rep(8,dim(train_8)[1]))
+Y=train_Y
+train_358=cbind(Y,train_358_X)
+test=read.table("zip_test.txt")
+test_3=test[test[,1]==3,]
+names(test_3)=c("Y",names(test_3)[1:256])
+test_5=test[test[,1]==5,]
+names(test_5)=c("Y",names(test_5)[1:256])
+test_8=test[test[,1]==8,]
+names(test_8)=c("Y",names(test_8)[1:256])
+test_358_X=rbind(test_3[,-1],test_5[,-1],test_8[,-1])
+test_Y=c(rep(3,dim(test_3)[1]),rep(5,dim(test_5)[1]),rep(8,dim(test_8)[1]))
+```
+
+```{r}
+#P4.1
+library(MASS)
+lda.fit=lda(Y~.,data=train_358)
+lda.pred_test=predict(lda.fit,test_358_X)
+mean(lda.pred_test$class==test_Y)
+#test misclassification error
+```
+```{r}
+lda.pred_train=predict(lda.fit,train_358_X)
+mean(lda.pred_train$class==train_Y)
+#training misclassification error
+```
+
+```{r}
+#P4.2
+#PCA
+
+pca=prcomp(train_358_X,scale=T)
+loadings=pca$rotation
+loadings_49=loadings[,1:49]
+PC=paste(rep("PC",49),seq(1,49,1),sep="")
+PC49=data.frame(as.matrix(scale(train_358_X,center=T,scale=T))%*%as.matrix(loadings_49))
+
+#LDA
+lda.fit.pca=lda(Y~.,data=cbind(Y,PC49))
+#training misclassification error
+lda.pred_train=predict(lda.fit.pca,PC49)
+mean(lda.pred_train$class==train_Y)
+```
+
+```{r}
+#test misclassification error
+PC49_test=data.frame(as.matrix(scale(test_358_X,center=T,scale=T))%*%as.matrix(loadings_49))
+lda.pred_test=predict(lda.fit.pca,PC49_test)
+mean(lda.pred_test$class==test_Y)
+```
+
+```{r}
+#P4.3
+#logistic
+library(glmnet)
+glm.fit=glmnet(x=as.matrix(PC49),y=Y,family="multinomial",type.measure="class")
+#test error
+glm.pred.test=predict(glm.fit,as.matrix(PC49_test),type="class",s=min(glm.fit$lambda))
+mean(test_Y==glm.pred.test)
+#training error
+glm.pred.train=predict(glm.fit,as.matrix(PC49),type="class",s=min(glm.fit$lambda))
+mean(train_Y==glm.pred.train)
+
+```
+
+```
+#P5
+#PCA.finance1
+library(quantmod)
+stocks_30=c("MMM","AXP","AMGN","AAPL","BA","CAT","CVX","CSCO","KO","DOW","GS")
+dataset1=data.frame(rep(NA,253))
+for (i in stocks_30){
+  eachdata= getSymbols(i, auto.assign = F, from ="2020-01-01", to = "2021-01-01")
+  
+  dataset1=cbind(dataset1,eachdata[,4])
+}
+dataset1=dataset1[,-1]
+
+#PCA.finance2
+library(quantmod)
+stocks_30=c("HD","HON","IBM","INTC","JNJ","JPM","MCD","MRK")
+dataset2=data.frame(rep(NA,253))
+for (i in stocks_30){
+  eachdata= getSymbols(i, auto.assign = F, from ="2020-01-01", to = "2021-01-01")
+  
+  dataset2=cbind(dataset2,eachdata[,4])
+}
+dataset2=dataset2[,-1]
+
+#PCA.finance3
+library(quantmod)
+stocks_30=c("MSFT","NKE","PG","CRM","TRV","UNH","VZ","V","WBA","WMT","DIS")
+dataset3=data.frame(rep(NA,253))
+for (i in stocks_30){
+  eachdata= getSymbols(i, auto.assign = F, from ="2020-01-01", to = "2021-01-01")
+  
+  dataset3=cbind(dataset3,eachdata[,4])
+}
+dataset3=dataset3[,-1]
+
+dataset=cbind(dataset1,dataset2,dataset3)
+write.csv(dataset,file="stocks_30.csv",row.names=F)
+```
+
+
+```{r}
+#P5.2
+stocks_30=read.csv("stocks_30.csv")
+names(stocks_30)=c("MMM","AXP","AMGN","AAPL","BA","CAT","CVX","CSCO","KO","DOW","GS","HD","HON","IBM","INTC","JNJ","JPM","MCD","MRK","MSFT","NKE","PG","CRM","TRV","UNH","VZ","V","WBA","WMT","DIS")
+pca.30=prcomp(stocks_30,scale=F)
+biplot(pca.30,cex=0.5)
+screeplot(pca.30,type="l")
+#BA has by far the largest loading on the first principal component and second principal component.
+#first two PC are enough.
+```
+
+```{r}
+#P5.3
+pca.30=prcomp(stocks_30,scale=T)
+biplot(pca.30,cex=0.5)
+screeplot(pca.30,type="l")
+#first two or three PC are enough.
+#there is not obvious large loading in scaled PCA.
+```
+
+```{r}
+#P5.4
+return_30=(stocks_30[2:253,]-stocks_30[1:252,])/stocks_30[1:252,]
+pca.30=prcomp(return_30,scale=T)
+biplot(pca.30,cex=0.5)
+screeplot(pca.30,type="l")
+#first two  PC are enough.
+#PC1 can explain most of the variance. there are relationship between these stocks.
+#if  If each stock were fluctuating up and down randomly and independent of all the other stocks, the screeplot should have slower decreasing instead of steep slope.
+```
+
+```{r}
+#P6
+# Define output.image function (Lab 2)
+output.image<-function(vector) {
+  digit<-matrix(vector, nrow=16, ncol=16)
+  index= seq(from=16, to =1, by=-1)
+  sym_digit = digit[,index]
+  image(sym_digit, col= gray((8:0)/8), axes=FALSE)
+}
+
+# Read in digits features for 3,5,8
+digit_3 <- read.table("train_3.txt",header = F,sep=',')
+digit_5 <- read.table("train_5.txt",header = F,sep=',')
+digit_8 <- read.table("train_8.txt",header = F,sep=',')
+
+# Define temporary data matrix
+X_temp <- rbind(digit_3,digit_5,digit_8)
+dim(X_temp)
+
+# Extract "test" cases
+# Test case 1
+ConstructCase_1 <- X_temp[20,] 
+output.image(as.matrix(ConstructCase_1))
+ConstructCase_1 <- unlist(ConstructCase_1) # Not needed but might be helpful
+
+# Test case 2
+ConstructCase_2 <- X_temp[735,] 
+output.image(as.matrix(ConstructCase_2))
+ConstructCase_2 <- unlist(ConstructCase_2) # Not needed but might be helpful
+
+# Test case 3
+ConstructCase_3 <- X_temp[1260,] 
+output.image(as.matrix(ConstructCase_3))
+ConstructCase_3 <- unlist(ConstructCase_3) # Not needed but might be helpful
+
+# Remove cases 20, 735, 1260 from original dataframe
+X <- X_temp[-c(20,735,1260),]
+dim(X)
+```
+
+```{r}
+pca.x=prcomp(X,scale=T)
+cum_var=summary(pca.x)$importance[3,]
+plot(1:256,cum_var,type="l")
+min(which(cum_var>.9))
+#first 73 PC  yield 90% explained variance
+```
+
+```{r}
+par(mfrow=c(4,4),mai=c(.1,.1,.1,.1))
+for(i in 1:16){
+  output.image(as.matrix(pca.x$rotation[,i]))
+}
+```
+
+```{r}
+par(mfrow=c(3,3))
+n_matrix=matrix(rep(0,256),nrow=256)
+#for case1
+for (i in c(3,58,256)){
+  for (j in 1:i){
+    n_matrix=n_matrix+as.numeric(t(as.matrix(scale(ConstructCase_1)))%*%as.matrix(pca.x$rotation[,j]))*as.matrix(pca.x$rotation[,j])
+  }
+  output.image(n_matrix)
+}
+
+#for ConstructCase_2
+n_matrix=matrix(rep(0,256),nrow=256)
+for (i in c(3,58,256)){
+  for (j in 1:i){
+    n_matrix=n_matrix+as.numeric(t(as.matrix(scale(ConstructCase_2)))%*%as.matrix(pca.x$rotation[,j]))*as.matrix(pca.x$rotation[,j])
+  }
+  output.image(n_matrix)
+}
+#for ConstructCase_3
+n_matrix=matrix(rep(0,256),nrow=256)
+for (i in c(3,58,256)){
+  for (j in 1:i){
+    n_matrix=n_matrix+as.numeric(t(as.matrix(scale(ConstructCase_3)))%*%as.matrix(pca.x$rotation[,j]))*as.matrix(pca.x$rotation[,j])
+  }
+  output.image(n_matrix)
+}
+```
